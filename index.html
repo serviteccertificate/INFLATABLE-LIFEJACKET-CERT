@@ -161,11 +161,20 @@
   #printArea{display:none;}
   .pageno{text-align:right;font-weight:bold;font-size:9pt;margin:2px 0 6px;color:var(--titlecolor);}
 
+  /* ---------- PREVIEW OVERLAY (ดูตัวอย่างเต็มจอก่อนพิมพ์) ---------- */
+  #previewOverlay{display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);flex-direction:column;}
+  #previewOverlay.open{display:flex;}
+  .pv-bar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#0e2a52;color:#fff;flex:0 0 auto;flex-wrap:wrap;}
+  .pv-bar .pv-title{font-weight:bold;margin-right:auto;font-size:14px;}
+  .pv-body{flex:1 1 auto;overflow:auto;padding:22px 12px 40px;-webkit-overflow-scrolling:touch;}
+  .pv-body .page{margin:0 auto 18px;}
+
   /* ---------- PRINT ---------- */
   @media print{
     @page{size:A4 portrait;margin:0;}
     html,body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     .toolbar,.hint,.rowtools,.rowdel,.no-print{display:none !important;}
+    #previewOverlay{display:none !important;}
     #sheet{display:none !important;}
     #printArea{display:block !important;width:auto;margin:0;}
     #printArea .page{width:auto;min-height:auto;margin:0;padding:4mm 11mm 3mm;box-shadow:none;display:block;page-break-after:always;}
@@ -185,6 +194,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
 <div class="toolbar no-print">
   <div class="brand">Inflatable Life Jacket Certificate Generator<small>Marine Servitec Co., Ltd. — FR-SE-07 Rev.05</small></div>
   <button class="btn green" onclick="doPrint()">🖨️ สร้าง / พิมพ์ PDF</button>
+  <button class="btn" onclick="doPreview()">👁️ พรีวิว</button>
   <button class="btn" onclick="addRow()">➕ เพิ่มรายการ</button>
   <button class="btn" onclick="addRows(5)">➕ เพิ่มรายการ ×5</button>
   <button class="btn grey" onclick="exportData()">⬇️ บันทึกข้อมูล</button>
@@ -362,6 +372,15 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
 
 <div class="sheet" id="printArea" aria-hidden="true"></div>
 
+<div id="previewOverlay" class="no-print" aria-hidden="true">
+  <div class="pv-bar">
+    <span class="pv-title">👁️ พรีวิวใบรับรอง — ตรวจก่อนพิมพ์</span>
+    <button class="btn green" onclick="printFromPreview()">🖨️ พิมพ์ / บันทึก PDF</button>
+    <button class="btn grey" onclick="closePreview()">✕ ปิด</button>
+  </div>
+  <div class="pv-body" id="previewBody"></div>
+</div>
+
 <script>
   var FIELDS=["f_shipmaster","f_year","f_month","f_date","f_vessel","f_imo","f_refcert",
     "f_place","f_flag","f_class","f_nextinsp","f_insp_name","f_insp_date","f_appr_name","f_appr_date"];
@@ -426,7 +445,12 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       '<td class="delcell no-print"><button class="rowdel" onclick="removeRow(this)" title="ลบแถวนี้">✕</button></td>';
     tr.querySelectorAll('input').forEach(function(el){
       if(el.getAttribute('data-col')==='workingcodes'){
-        el.addEventListener('input',scheduleSave);
+        el.addEventListener('input',function(){
+          var atEnd=(el.selectionStart==null)||(el.selectionStart===el.value.length);
+          formatWorkingCodes(el);              // ใส่ลูกน้ำทันทีที่เขียน เช่น 1234 -> 1,2,3,4
+          if(atEnd){ try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){} }
+          scheduleSave();
+        });
         el.addEventListener('blur',function(){formatWorkingCodes(el);});
       }else{
         el.addEventListener('input',scheduleSave);
@@ -754,6 +778,25 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
   }
   function doPrint(){ buildPrintArea(); setTimeout(function(){ window.print(); }, 50); }
   window.addEventListener('beforeprint', buildPrintArea);
+
+  /* ---------- PREVIEW (ดูตัวอย่างเต็มจอก่อนพิมพ์ — เหมือนไฟล์อื่น) ---------- */
+  function doPreview(){
+    buildPrintArea();
+    document.getElementById('previewBody').innerHTML = document.getElementById('printArea').innerHTML;
+    var ov=document.getElementById('previewOverlay');
+    ov.classList.add('open'); ov.setAttribute('aria-hidden','false');
+    document.body.style.overflow='hidden';
+    document.querySelector('#previewOverlay .pv-body').scrollTop=0;
+  }
+  function closePreview(){
+    var ov=document.getElementById('previewOverlay');
+    ov.classList.remove('open'); ov.setAttribute('aria-hidden','true');
+    document.body.style.overflow='';
+  }
+  function printFromPreview(){ buildPrintArea(); setTimeout(function(){ window.print(); }, 50); }
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && document.getElementById('previewOverlay').classList.contains('open')) closePreview();
+  });
 
   /* ---------- CLOUD DASHBOARD (Google Sheet — shared with Fixed CO2) ---------- */
   var CURL_KEY='fixedco2_cloud_url';
