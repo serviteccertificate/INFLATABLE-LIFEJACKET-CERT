@@ -317,6 +317,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
           <div>9 = RENEWED REFLECTIVE TAPE</div>
           <div>10 = RENEWED CO2 CYLINDER</div>
           <div>11 = NEW SUPPLIED</div>
+          <div>12 = REJECT</div>
         </div>
       </div>
     </div>
@@ -390,14 +391,14 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
   /* preset working-code combinations
      (1=INSPECTION VISUAL, 2=WORKING PRESSURE TEST, 3=CYLINDER FITTED, 4=REPACKED,
       5=RENEWED OPERATING HEAD, 6=RENEWED BOBBIN, 7=RENEWED BATTERY LIGHT,
-      8=RENEWED WHISTLE, 9=RENEWED REFLECTIVE TAPE, 10=RENEWED CO2 CYLINDER, 11=NEW SUPPLIED) */
+      8=RENEWED WHISTLE, 9=RENEWED REFLECTIVE TAPE, 10=RENEWED CO2 CYLINDER, 11=NEW SUPPLIED, 12=REJECT) */
   var WORKINGCODES_PRESETS=[
     '1,2,3',
     '1,2,3,4',
     '1,2,3,4,6',
     '1,2,3,4,10',
     '1,2',
-    '1','2','3','4','5','6','7','8','9','10','11'
+    '1','2','3','4','5','6','7','8','9','10','11','12'
   ];
   function workingCodesOptionsHtml(){
     return '<option value="">— เลือกรหัสสำเร็จรูป —</option>'+
@@ -413,7 +414,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
   /* จัดรูปแบบรหัสการทำงานให้มีคอมมาคั่น: รองรับรหัส 1-11 (เก็บเฉพาะเลข 1-11)
      เช่น "5 8 10" -> "5,8,10" · ทำงานตอนคลิกออกจากช่อง (blur) เพื่อไม่ให้เลขสองหลักถูกแยก */
   function fmtWC(s){
-    var nums=(String(s==null?'':s).match(/1[01]|[1-9]/g)||[]);
+    var nums=(String(s==null?'':s).match(/1[012]|[1-9]/g)||[]);
     return nums.join(',');
   }
   function formatWorkingCodes(el){ el.value=fmtWC(el.value); }
@@ -471,7 +472,11 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     renumber();scheduleSave();
   }
   function removeRow(btn){
-    var tr=btn.closest('tr');if(tr)tr.remove();
+    var tr=btn.closest('tr');if(!tr)return;
+    var no=tr.querySelector('td.no');
+    var label=(no&&no.textContent)?('รายการที่ '+no.textContent):'รายการนี้';
+    if(!confirm('ต้องการลบ'+label+'ใช่หรือไม่?'))return;
+    tr.remove();
     renumber();scheduleSave();
   }
   function renumber(){
@@ -588,7 +593,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     return '<div class="codesbox"><div class="hd">DESCRIPTION OF WORKING CODES</div><div class="cols">'+
       '<div><div>1 = INSPECTION VISUAL OF ALL COMPONENTS,<br>CONDITION &amp; ATTACHED PARTS</div><div>2 = WORKING PRESSURE TEST</div><div>3 = CYLINDER FITTED</div><div>4 = REPACKED</div></div>'+
       '<div><div>5 = RENEWED OPERATING HEAD</div><div>6 = RENEWED BOBBIN</div><div>7 = RENEWED BATTERY LIGHT</div><div>8 = RENEWED WHISTLE</div></div>'+
-      '<div><div>9 = RENEWED REFLECTIVE TAPE</div><div>10 = RENEWED CO2 CYLINDER</div><div>11 = NEW SUPPLIED</div></div></div></div>';
+      '<div><div>9 = RENEWED REFLECTIVE TAPE</div><div>10 = RENEWED CO2 CYLINDER</div><div>11 = NEW SUPPLIED</div><div>12 = REJECT</div></div></div></div>';
   }
   function ljItemRowHtml(r,num){
     return '<tr><td class="no">'+num+'</td><td>'+esc(r.manufacturer)+'</td><td>'+esc(r.modeltype)+'</td><td>'+esc(r.serial)+'</td><td>'+esc(r.dom)+'</td><td>'+esc(r.cylinder)+'</td><td>'+esc(r.expdate)+'</td><td>'+esc(r.workingcodes)+'</td></tr>';
@@ -762,12 +767,26 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       return pages;
     }catch(e){ return null; }
   }
+  /* ตัดแถวว่างท้ายตารางออกก่อนพิมพ์ เพื่อให้จำนวนหน้าตรงกับข้อมูลจริง
+     (แถวว่างที่ยังไม่ได้กรอกจะไม่ถูกนับ ทำให้ข้อมูลหน้าเดียวพิมพ์ออกมาหน้าเดียว
+      ส่วนหน้าสุดท้ายจะถูกเติมแถวว่างให้เต็มหน้าโดยอัตโนมัติอยู่แล้ว) */
+  function isEmptyRow(r){
+    if(!r)return true;
+    for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k) && r[k]!=null && String(r[k]).trim()!=='' ) return false; }
+    return true;
+  }
+  function stripTrailingEmptyRows(rows){
+    var end=rows.length;
+    while(end>0 && isEmptyRow(rows[end-1])) end--;
+    return rows.slice(0,end);
+  }
   function buildPrintArea(){
     var d=collect();
-    var pages=paginateLJRowsByHeight(d.rows, d.fields);
+    var rows=stripTrailingEmptyRows(d.rows);
+    var pages=paginateLJRowsByHeight(rows, d.fields);
     if(!pages){
-      var caps=measureLJCaps(d.fields, d.rows);
-      pages=paginateLJRows(d.rows, caps);
+      var caps=measureLJCaps(d.fields, rows);
+      pages=paginateLJRows(rows, caps);
     }
     var html='', offset=0;
     pages.forEach(function(p,idx){
