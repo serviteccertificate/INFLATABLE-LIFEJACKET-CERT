@@ -72,15 +72,15 @@
   table.inforow td.val input{border:0;background:transparent;font-weight:bold;text-align:center;font-size:8pt;}
   table.inforow{margin-bottom:3px;}
 
-  .p1-intro{font-weight:bold;font-style:italic;font-size:9.5pt;text-align:center;margin:10px 0;line-height:1.5;}
+  .p1-intro{font-weight:bold;font-style:italic;font-size:9.5pt;text-align:center;margin:6px 0;line-height:1.4;}
 
   .codesbox{border:1px solid var(--line);margin:8px 0;font-size:8pt;font-weight:bold;}
   .codesbox .hd{background:var(--hdrfill);text-decoration:underline;padding:3px 6px;}
-  .codesbox .cols{display:grid;grid-template-columns:2.2fr 1.6fr 1.4fr;gap:10px;padding:6px 10px;}
-  .codesbox .cols div div{line-height:1.6;margin-bottom:1px;}
+  .codesbox .cols{display:grid;grid-template-columns:2.2fr 1.6fr 1.4fr;gap:10px;padding:4px 10px;}
+  .codesbox .cols div div{line-height:1.45;margin-bottom:1px;}
 
-  table.items th{background:var(--hdrfill);font-weight:bold;text-align:center;font-size:7.5pt;line-height:1.15;padding:2px 2px;height:26px;}
-  table.items td{text-align:center;font-size:8pt;height:26px;}
+  table.items th{background:var(--hdrfill);font-weight:bold;text-align:center;font-size:7.5pt;line-height:1.15;padding:2px 2px;height:22px;}
+  table.items td{text-align:center;font-size:8pt;height:21px;}
   table.items td.no{font-weight:bold;background:#f4f4f4;width:4%;}
   table.items td input{border:0;background:transparent;text-align:center;font-size:8pt;padding:0;}
   table.items td input:focus{background:#fff7cc;outline:1px solid #2563eb;}
@@ -105,11 +105,11 @@
   td.delcell{border:0;}
   .rowdel{cursor:pointer;color:#dc2626;font-weight:bold;border:0;background:transparent;font-size:13px;line-height:1;}
 
-  .p1-next{font-weight:bold;font-size:10pt;margin-top:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  .p1-next{font-weight:bold;font-size:10pt;margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .p1-next input{display:inline-block;width:auto;min-width:150px;background:transparent;border:0;border-bottom:1px dotted #888;font-weight:bold;font-size:10pt;text-transform:uppercase;}
 
-  .sign{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;text-align:center;font-weight:bold;font-size:9pt;}
-  .sign .line{margin:24px auto 3px;}
+  .sign{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px;text-align:center;font-weight:bold;font-size:9pt;}
+  .sign .line{margin:16px auto 3px;}
   .sign input{text-align:center;}
   .sign input.namefld{display:inline-block;width:14ch;min-width:6ch;max-width:95%;text-align:center;}
   .sign .role{margin-top:2px;}
@@ -780,14 +780,58 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     while(end>0 && isEmptyRow(rows[end-1])) end--;
     return rows.slice(0,end);
   }
+  /* ---------- จำนวนรายการสูงสุดต่อหน้า (ปรับตัวเลขได้ที่นี่) ----------
+     หน้าแรกมีหัวใบรับรอง (ตารางข้อมูล + กล่องคำอธิบายรหัส) จึงใส่ได้น้อยกว่าหน้าถัดไป
+     - firstWithSig : หน้า 1 หน้าเดียวจบ (มีลายเซ็นท้ายหน้า) → ถ้าข้อมูล ≤ ค่านี้ จะอยู่หน้าเดียว ไม่ขึ้นหน้า 2
+     - firstNoSig   : หน้า 1 เมื่อยังมีหน้าถัดไป (ไม่มีลายเซ็น)
+     - midWithSig   : หน้าต่อ ๆ ไปที่เป็นหน้าสุดท้าย (มีลายเซ็น)
+     - midNoSig     : หน้าต่อ ๆ ไปที่ยังมีหน้าถัดไป (ไม่มีลายเซ็น)
+     ลายเซ็นจะอยู่เฉพาะหน้าสุดท้ายเท่านั้นเสมอ */
+  var LJ_CAPS = { firstWithSig:24, firstNoSig:26, midWithSig:30, midNoSig:35 };
+
+  function paginateLJFixed(rows, caps){
+    caps = caps || LJ_CAPS;
+    var n = rows.length;
+    var pages = [];
+    if(n <= caps.firstWithSig){
+      pages.push({rows: rows.slice(), first:true, withSig:true});
+    } else {
+      var idx=0, first=true;
+      while(idx < n){
+        var remaining = n - idx;
+        var withSigCap = first ? caps.firstWithSig : caps.midWithSig;
+        var noSigCap   = first ? caps.firstNoSig   : caps.midNoSig;
+        if(remaining <= withSigCap){
+          pages.push({rows: rows.slice(idx), first:first, withSig:true});
+          idx = n;
+        } else {
+          var take = Math.min(noSigCap, remaining);
+          pages.push({rows: rows.slice(idx, idx+take), first:first, withSig:false});
+          idx += take;
+        }
+        first=false;
+      }
+      // กันหน้าสุดท้ายไม่มีลายเซ็น (เกิดเมื่อแถวเต็มพอดีจนไม่เหลือที่ให้ลายเซ็น)
+      var last = pages[pages.length-1];
+      if(!last.withSig){
+        var lastWithSigCap = (pages.length===1) ? caps.firstWithSig : caps.midWithSig;
+        if(last.rows.length <= lastWithSigCap){
+          last.withSig = true;
+        } else {
+          var move = Math.max(1, last.rows.length - lastWithSigCap);
+          var tail = last.rows.splice(last.rows.length - move, move);
+          pages.push({rows: tail, first:false, withSig:true});
+        }
+      }
+    }
+    // ไม่เติมแถวว่าง — แสดงเฉพาะรายการจริงเท่านั้น (จบที่แถวข้อมูลสุดท้าย แล้วต่อด้วยลายเซ็น)
+    return pages;
+  }
+
   function buildPrintArea(){
     var d=collect();
     var rows=stripTrailingEmptyRows(d.rows);
-    var pages=paginateLJRowsByHeight(rows, d.fields);
-    if(!pages){
-      var caps=measureLJCaps(d.fields, rows);
-      pages=paginateLJRows(rows, caps);
-    }
+    var pages=paginateLJFixed(rows, LJ_CAPS);
     var html='', offset=0;
     pages.forEach(function(p,idx){
       html+=renderLJPage(d.fields, p, idx+1, pages.length, offset);
