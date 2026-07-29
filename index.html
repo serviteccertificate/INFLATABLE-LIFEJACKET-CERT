@@ -213,7 +213,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
   <span id="cloudStatus" class="cloudStatus"></span>
   <div id="cloudCfg" class="cloudCfg" style="display:none">
     <label style="flex:1 1 480px">
-      📋 Apps Script Web App URL — ใช้ลิงก์เดียวกับ Fixed CO2 (ฐานข้อมูลเดียวกัน):
+      📋 Apps Script Web App URL — ของ Lifejacket โดยเฉพาะ (ห้ามใช้ลิงก์เดียวกับ Fixed CO2):
       <input id="cloudUrl" type="url" placeholder="https://script.google.com/macros/s/……/exec">
     </label>
     <button class="btn green" onclick="saveCloudUrl()">💾 บันทึกลิงก์</button>
@@ -243,8 +243,8 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
 
 <div class="hint no-print">
   กรอกข้อมูลในช่องสีฟ้าได้เลย → กดปุ่ม <b>"สร้าง / พิมพ์ PDF"</b> แล้วเลือก <b>Save as PDF</b> เพื่อบันทึกใบรับรอง ·
-  ใบนี้ใช้ <b>ฐานข้อมูล Google Sheet เดียวกัน</b> กับ Fixed CO2 Certificate Generator (คนละชีต: LJCerts / LJItems) —
-  วางลิงก์ Apps Script เดียวกันได้เลย · รูปแบบหน้ากระดาษตรงกับต้นฉบับ FR-SE-07 Rev.05<br>
+  ใบนี้ต้องใช้ <b>Apps Script Web App คนละตัว/คนละลิงก์กับ Fixed CO2</b> (แม้จะอยู่ใน Google Sheet ไฟล์เดียวกันได้ แต่ต้อง Deploy เป็น Web App แยกที่ผูกกับชีต LJCerts / LJItems โดยเฉพาะ) —
+  ห้ามวางลิงก์ /exec เดียวกับที่ใช้ในหน้า Fixed CO2 มิฉะนั้นข้อมูลจะไปเขียนทับกัน · รูปแบบหน้ากระดาษตรงกับต้นฉบับ FR-SE-07 Rev.05<br>
   <b>✏️ iPad + Apple Pencil:</b> เปิด <b>Settings → Apple Pencil → Scribble</b> แล้วเขียนด้วยปากกาลงในช่องได้เลย · ติ๊ก "โหมดเขียน" ด้านบนเพื่อขยายช่อง (ใช้ตอนกรอกเท่านั้น ไม่กระทบตอนพิมพ์)
 </div>
 
@@ -861,8 +861,8 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     if(e.key==='Escape' && document.getElementById('previewOverlay').classList.contains('open')) closePreview();
   });
 
-  /* ---------- CLOUD DASHBOARD (Google Sheet — shared with Fixed CO2) ---------- */
-  var CURL_KEY='fixedco2_cloud_url';
+  /* ---------- CLOUD DASHBOARD (Google Sheet — Apps Script แยกเฉพาะ Lifejacket) ---------- */
+  var CURL_KEY='lifejacket_cloud_url';
   function getCloudUrl(){try{return localStorage.getItem(CURL_KEY)||'';}catch(e){return window.__curl||'';}}
   function setCloudUrl(v){try{localStorage.setItem(CURL_KEY,v);}catch(e){window.__curl=v;}}
   function cstatus(t,err){var s=document.getElementById('cloudStatus');if(!s)return;s.textContent=t;s.style.color=err?'#dc2626':'#15803d';}
@@ -1010,7 +1010,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     var mscImg=document.getElementById('mscLogo'), clsImg=document.getElementById('classLogo');
     if(mscImg)mscImg.src=LOGO_MSC_DATA;
     if(clsImg)clsImg.src=LOGO_CLASS_DATA;
-    if(getCloudUrl())cstatus('เชื่อมต่อ Google Sheet แล้ว ✓ (ใช้ฐานข้อมูลเดียวกับ Fixed CO2)');
+    if(getCloudUrl())cstatus('เชื่อมต่อ Google Sheet แล้ว ✓');
     var loaded=await loadStore();
     if(!loaded){setYearDefaults();for(var i=0;i<19;i++)addRow();}
     try{
