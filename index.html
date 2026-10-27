@@ -99,8 +99,23 @@
     display:block;width:100%;border:1px solid #b9c4d0;border-radius:3px;background:#eef5ff;
     font-size:7pt;padding:1px 2px;margin-bottom:2px;color:#1b3a66;
   }
-  table.items td.remarks select.rk-select:focus,
-  table.items td.wcodes select.rk-select:focus{outline:1px solid #2563eb;}
+  table.items td.remarks select.rk-select:focus{outline:1px solid #2563eb;}
+  /* working-code picker */
+  .wc-btn{display:block;width:100%;border:1px solid #b9c4d0;border-radius:3px;background:#eef5ff;
+    font-size:7pt;padding:2px;margin-bottom:2px;color:#1b3a66;cursor:pointer;font-family:Arial,Helvetica,sans-serif;}
+  .wc-btn:hover{background:#dbeafe;}
+  #wcPop{display:none;position:absolute;z-index:200;background:#fff;border:1px solid #9bb4d4;border-radius:8px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);padding:10px;width:290px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1b3a66;}
+  #wcPop.open{display:block;}
+  #wcPop .wc-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:6px 0 8px;}
+  #wcPop .wc-chip{border:1px solid #9bb4d4;background:#f8fafc;border-radius:6px;padding:8px 0;font-size:14px;font-weight:bold;
+    cursor:pointer;color:#1b3a66;text-align:center;}
+  #wcPop .wc-chip.on{background:#2563eb;border-color:#2563eb;color:#fff;}
+  #wcPop .wc-presets{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+  #wcPop .wc-preset{border:1px dashed #9bb4d4;background:#fff;border-radius:5px;padding:4px 6px;font-size:11px;cursor:pointer;color:#1b3a66;}
+  #wcPop .wc-legend{font-size:10px;color:#475569;line-height:1.45;max-height:120px;overflow:auto;border-top:1px solid #e2e8f0;padding-top:6px;}
+  #wcPop .wc-foot{display:flex;justify-content:space-between;gap:6px;margin-top:8px;}
+  #wcPop .wc-foot button{border:0;border-radius:6px;padding:6px 12px;font-weight:bold;cursor:pointer;font-size:12px;}
   .delcol{width:18px;border:0 !important;background:#fff;}
   td.delcell{border:0;}
   .rowdel{cursor:pointer;color:#dc2626;font-weight:bold;border:0;background:transparent;font-size:13px;line-height:1;}
@@ -400,23 +415,83 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     '1,2',
     '1','2','3','4','5','6','7','8','9','10','11','12'
   ];
-  function workingCodesOptionsHtml(){
-    return '<option value="">— เลือกรหัสสำเร็จรูป —</option>'+
-      WORKINGCODES_PRESETS.map(function(v){return '<option value="'+esc(v)+'">'+esc(v)+'</option>';}).join('');
+  var WC_LABELS={1:'INSPECTION VISUAL',2:'WORKING PRESSURE TEST',3:'CYLINDER FITTED',4:'REPACKED',
+    5:'RENEWED OPERATING HEAD',6:'RENEWED BOBBIN',7:'RENEWED BATTERY LIGHT',8:'RENEWED WHISTLE',
+    9:'RENEWED REFLECTIVE TAPE',10:'RENEWED CO2 CYLINDER',11:'NEW SUPPLIED',12:'REJECT'};
+
+  /* แปลงข้อความเป็นรายการรหัส 1-12
+     - คั่นด้วย , เว้นวรรค . / - หรืออักขระอื่นได้ทุกแบบ  เช่น "1 2 10 12" -> 1,2,10,12
+     - ตัวเลข 1-12 ที่เขียนติดกันเป็นก้อนเดียว (เช่น 10, 11, 12) ถือเป็นรหัสเดียว
+     - ก้อนตัวเลขยาว/เกิน 12 (เช่น 1234) จะแยกทีละหลัก -> 1,2,3,4
+     - เรียงจากน้อยไปมาก และตัดซ้ำออก */
+  function parseWC(s){
+    s=String(s==null?'':s).replace(/[oO]/g,'0');           // Scribble บางครั้งอ่าน 0 เป็นตัว O
+    var tokens=s.split(/[^0-9]+/).filter(Boolean), out=[];
+    tokens.forEach(function(t){
+      var n=parseInt(t,10);
+      if(t.length<=2 && n>=1 && n<=12){ out.push(n); }
+      else{ t.split('').forEach(function(ch){ var d=parseInt(ch,10); if(d>=1&&d<=9) out.push(d); }); }
+    });
+    out=out.filter(function(v,i){return out.indexOf(v)===i;}).sort(function(a,b){return a-b;});
+    return out;
   }
-  function onWorkingCodesPreset(sel){
-    if(!sel.value)return;
-    var input=sel.nextElementSibling;
-    input.value=sel.value;
-    input.dispatchEvent(new Event('input',{bubbles:true}));
-    sel.value='';
+  function fmtWC(s){ return parseWC(s).join(','); }
+
+  /* ---------- ตัวเลือกรหัส (popup) ---------- */
+  var wcTarget=null;
+  function buildWcPop(){
+    var pop=document.createElement('div'); pop.id='wcPop'; pop.className='no-print';
+    var chips=''; for(var i=1;i<=12;i++) chips+='<button type="button" class="wc-chip" data-n="'+i+'" title="'+WC_LABELS[i]+'">'+i+'</button>';
+    var presets=WORKINGCODES_PRESETS.filter(function(v){return v.indexOf(',')>=0;})
+      .map(function(v){return '<button type="button" class="wc-preset" data-v="'+v+'">'+v+'</button>';}).join('');
+    var legend=''; for(var j=1;j<=12;j++) legend+='<div><b>'+j+'</b> = '+WC_LABELS[j]+'</div>';
+    pop.innerHTML='<b>แตะเลือกรหัส (เลือกได้หลายตัว)</b><div class="wc-grid">'+chips+'</div>'+
+      '<div style="font-size:11px;margin-bottom:3px">ชุดสำเร็จรูป:</div><div class="wc-presets">'+presets+'</div>'+
+      '<div class="wc-legend">'+legend+'</div>'+
+      '<div class="wc-foot"><button type="button" id="wcClear" style="background:#e2e8f0;color:#334155">ล้าง</button>'+
+      '<button type="button" id="wcDone" style="background:#16a34a;color:#fff">เสร็จ ✓</button></div>';
+    document.body.appendChild(pop);
+    pop.addEventListener('click',function(e){
+      e.stopPropagation();
+      if(!wcTarget)return;
+      var t=e.target;
+      if(t.classList.contains('wc-chip')){
+        var n=parseInt(t.getAttribute('data-n'),10), cur=parseWC(wcTarget.value), k=cur.indexOf(n);
+        if(k>=0)cur.splice(k,1); else cur.push(n);
+        setWc(cur);
+      }else if(t.classList.contains('wc-preset')){ setWc(parseWC(t.getAttribute('data-v'))); }
+      else if(t.id==='wcClear'){ setWc([]); }
+      else if(t.id==='wcDone'){ closeWcPop(); }
+    });
+    document.addEventListener('click',function(e){
+      if(pop.classList.contains('open') && !e.target.closest('.wc-btn')) closeWcPop();
+    });
+    window.addEventListener('resize',closeWcPop);
+    return pop;
   }
-  /* จัดรูปแบบรหัสการทำงานให้มีคอมมาคั่น: รองรับรหัส 1-11 (เก็บเฉพาะเลข 1-11)
-     เช่น "5 8 10" -> "5,8,10" · ทำงานตอนคลิกออกจากช่อง (blur) เพื่อไม่ให้เลขสองหลักถูกแยก */
-  function fmtWC(s){
-    var nums=(String(s==null?'':s).match(/1[012]|[1-9]/g)||[]);
-    return nums.join(',');
+  function setWc(arr){
+    wcTarget.value=fmtWC(arr.join(','));
+    scheduleSave(); refreshWcPop();
   }
+  function refreshWcPop(){
+    var pop=document.getElementById('wcPop'), cur=parseWC(wcTarget?wcTarget.value:'');
+    pop.querySelectorAll('.wc-chip').forEach(function(c){
+      c.classList.toggle('on', cur.indexOf(parseInt(c.getAttribute('data-n'),10))>=0);
+    });
+  }
+  function openWcPop(btn){
+    var pop=document.getElementById('wcPop')||buildWcPop();
+    var input=btn.parentNode.querySelector('input[data-col="workingcodes"]');
+    if(pop.classList.contains('open') && wcTarget===input){ closeWcPop(); return; }
+    formatWorkingCodes(input);
+    wcTarget=input; refreshWcPop(); pop.classList.add('open');
+    var r=btn.getBoundingClientRect(), w=pop.offsetWidth, h=pop.offsetHeight;
+    var left=Math.min(r.left+window.scrollX, window.scrollX+document.documentElement.clientWidth-w-8);
+    var top=r.bottom+window.scrollY+4;
+    if(r.bottom+h+8>window.innerHeight && r.top-h-4>0) top=r.top+window.scrollY-h-4;
+    pop.style.left=Math.max(window.scrollX+8,left)+'px'; pop.style.top=top+'px';
+  }
+  function closeWcPop(){ var pop=document.getElementById('wcPop'); if(pop)pop.classList.remove('open'); wcTarget=null; }
   function formatWorkingCodes(el){ el.value=fmtWC(el.value); }
   function setPen(v){ document.body.classList.toggle('penmode', !!v); }
 
@@ -437,8 +512,8 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       '<td><input data-col="cylinder" value="'+esc(r.cylinder)+'"></td>'+
       '<td><input data-col="expdate" value="'+esc(r.expdate)+'"></td>'+
       '<td class="wcodes">'+
-        '<select class="rk-select no-print" onchange="onWorkingCodesPreset(this)">'+workingCodesOptionsHtml()+'</select>'+
-        '<input data-col="workingcodes" value="'+esc(fmtWC(r.workingcodes))+'" placeholder="หรือพิมพ์เอง...">'+
+        '<button type="button" class="wc-btn no-print" onclick="openWcPop(this)">☑ เลือกรหัส 1–12</button>'+
+        '<input data-col="workingcodes" inputmode="numeric" value="'+esc(fmtWC(r.workingcodes))+'" placeholder="เช่น 1 2 10">'+
       '</td>'+
       '<td class="remarks">'+
         '<textarea data-col="remarks" rows="1" style="text-transform:none" placeholder="พิมพ์หมายเหตุ...">'+esc(r.remarks)+'</textarea>'+
@@ -446,13 +521,10 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       '<td class="delcell no-print"><button class="rowdel" onclick="removeRow(this)" title="ลบแถวนี้">✕</button></td>';
     tr.querySelectorAll('input').forEach(function(el){
       if(el.getAttribute('data-col')==='workingcodes'){
-        el.addEventListener('input',function(){
-          var atEnd=(el.selectionStart==null)||(el.selectionStart===el.value.length);
-          formatWorkingCodes(el);              // ใส่ลูกน้ำทันทีที่เขียน เช่น 1234 -> 1,2,3,4
-          if(atEnd){ try{ el.setSelectionRange(el.value.length, el.value.length); }catch(e){} }
-          scheduleSave();
-        });
-        el.addEventListener('blur',function(){formatWorkingCodes(el);});
+        // ไม่จัดรูปแบบระหว่างพิมพ์ (เดิมทำให้พิมพ์ 10/11/12 หรือคอมมาไม่ได้) — จัดตอนออกจากช่องแทน
+        el.addEventListener('input',function(){ scheduleSave(); if(wcTarget===el) refreshWcPop(); });
+        el.addEventListener('blur',function(){ formatWorkingCodes(el); scheduleSave(); });
+        el.addEventListener('keydown',function(e){ if(e.key==='Enter'){ formatWorkingCodes(el); el.blur(); } });
       }else{
         el.addEventListener('input',scheduleSave);
       }
@@ -491,7 +563,10 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     FIELDS.forEach(function(f){var el=document.getElementById(f);if(el)d.fields[f]=el.value;});
     document.querySelectorAll('#itBody tr').forEach(function(tr){
       var row={};
-      tr.querySelectorAll('[data-col]').forEach(function(el){row[el.getAttribute('data-col')]=el.value;});
+      tr.querySelectorAll('[data-col]').forEach(function(el){
+        var c=el.getAttribute('data-col');
+        row[c]=(c==='workingcodes')?fmtWC(el.value):el.value;
+      });
       d.rows.push(row);
     });
     return d;
