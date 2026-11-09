@@ -512,6 +512,10 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
     pop.style.left=Math.max(window.scrollX+8,left)+'px'; pop.style.top=top+'px';
   }
   function closeWcPop(){ var pop=document.getElementById('wcPop'); if(pop)pop.classList.remove('open'); wcTarget=null; }
+  /* CYLINDER: หน่วยกรัมเป็น g เล็กเสมอ เช่น 33G / 33 G / 33g -> 33 g (ตัวอักษรอื่นเป็นตัวใหญ่) */
+  function fmtCyl(s){
+    return String(s==null?'':s).toUpperCase().replace(/(\d)\s*G(?![A-Z])/g,'$1 g');
+  }
   function formatWorkingCodes(el){ el.value=fmtWC(el.value); }
   function setPen(v){ document.body.classList.toggle('penmode', !!v); }
 
@@ -529,7 +533,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       '<td><input data-col="modeltype" value="'+esc(r.modeltype)+'"></td>'+
       '<td><input data-col="serial" value="'+esc(r.serial)+'"></td>'+
       '<td><input data-col="dom" value="'+esc(r.dom)+'"></td>'+
-      '<td><input data-col="cylinder" value="'+esc(r.cylinder)+'"></td>'+
+      '<td><input data-col="cylinder" style="text-transform:none" value="'+esc(fmtCyl(r.cylinder))+'"></td>'+
       '<td><input data-col="expdate" value="'+esc(r.expdate)+'"></td>'+
       '<td class="wcodes">'+
         '<button type="button" class="wc-btn no-print" onclick="openWcPop(this)">☑ เลือกรหัส 1–12</button>'+
@@ -545,6 +549,12 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
         el.addEventListener('input',function(){ scheduleSave(); if(wcTarget===el) refreshWcPop(); });
         el.addEventListener('blur',function(){ formatWorkingCodes(el); scheduleSave(); });
         el.addEventListener('keydown',function(e){ if(e.key==='Enter'){ formatWorkingCodes(el); el.blur(); } });
+      }else if(el.getAttribute('data-col')==='cylinder'){
+        el.addEventListener('input',function(){
+          var p=el.selectionStart, v=fmtCyl(el.value);
+          if(v!==el.value){ var d=v.length-el.value.length; el.value=v; try{el.setSelectionRange(p+d,p+d);}catch(_){} }
+          scheduleSave();
+        });
       }else{
         el.addEventListener('input',scheduleSave);
       }
@@ -585,7 +595,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       var row={};
       tr.querySelectorAll('[data-col]').forEach(function(el){
         var c=el.getAttribute('data-col');
-        row[c]=(c==='workingcodes')?fmtWC(el.value):el.value;
+        row[c]=(c==='workingcodes')?fmtWC(el.value):(c==='cylinder')?fmtCyl(el.value):el.value;
       });
       d.rows.push(row);
     });
@@ -781,7 +791,7 @@ var LOGO_CLASS_DATA = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAABnQAAAJdCAY
       '<div><div>9 = RENEWED REFLECTIVE TAPE</div><div>10 = RENEWED CO2 CYLINDER</div><div>11 = NEW SUPPLIED</div><div>12 = REJECT</div></div></div></div>';
   }
   function ljItemRowHtml(r,num){
-    return '<tr><td class="no">'+num+'</td><td>'+esc(r.manufacturer)+'</td><td>'+esc(r.modeltype)+'</td><td>'+esc(r.serial)+'</td><td>'+esc(r.dom)+'</td><td>'+esc(r.cylinder)+'</td><td>'+esc(r.expdate)+'</td><td>'+esc(r.workingcodes)+'</td></tr>';
+    return '<tr><td class="no">'+num+'</td><td>'+esc(r.manufacturer)+'</td><td>'+esc(r.modeltype)+'</td><td>'+esc(r.serial)+'</td><td>'+esc(r.dom)+'</td><td style="text-transform:none">'+esc(fmtCyl(r.cylinder))+'</td><td>'+esc(r.expdate)+'</td><td>'+esc(r.workingcodes)+'</td></tr>';
   }
   function ljItemsTableHtml(rowsHtml){
     return '<table class="items"><thead><tr>'+
